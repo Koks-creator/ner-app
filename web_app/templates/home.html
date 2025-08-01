@@ -2,26 +2,48 @@
 {% block content %}
 <div class="container">
     <div class="jumbotron">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flashes">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                    {{ message }}
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
         <h1>NER Analysis Results</h1>
         <form id="TurboForm" method="post" enctype="multipart/form-data" style="margin-bottom: 40px;">
             {{ form.hidden_tag() }}
-            {% if form.text_area.errors %}
-                {{ form.text_area(class='form-control is-invalid', multiple=True) }}
-                {% for error in form.text_area.errors %}
+            <div class="position-relative">
+                {% if form.text_area.errors %}
+                    {{ form.text_area(class='form-control is-invalid', id='text-area-input') }}
+                    {% for error in form.text_area.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                {% else %}
+                    {{ form.text_area(class='form-control', id='text-area-input') }}
+                {% endif %}
+                <small id="char-count" class="char-counter">0 / 10000</small>
+            </div>
+            <br>
+             {% if form.file_input.errors %}
+                {{ form.file_input(class='form-control is-invalid', multiple=True) }}
+                {% for error in form.file_input.errors %}
                 <div class="text-danger">{{ error }}</div>
                 {% endfor %}
             {% else %}
-                {{ form.text_area(class='form-control') }}
+                {{ form.file_input(class='form-control') }}
             {% endif %}
             <br>
-            {{ form.file_input }}
             {{ form.submit(class='submitButton') }}
         </form>
 
         {% if predictions_len %}
             <div class="card" style="color: black; margin-bottom: 20px; text-align: left;">
                 <div class="card-header">
-                    <h3>Summary:</h3>
+                    <h3>Summary ({{ predictions_len }}):</h3>
                 </div>
                 <div class="card-body">
                     {% for tag, values in all_tags_summary.items() %}
@@ -29,117 +51,148 @@
                     {% endfor %}
                 </div>
             </div>
-            {% for sent_id, sent_data in grouped_by_sent.items() %}
-                <div class="card" style="color: black; margin-bottom: 20px;">
-                    <div class="sentence-container mb-4" style="text-align: left;">
-                        <div class="card-header">
-                            <h3>{{ sent_id }}</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="highlighted-text">
-                                {% set ns = namespace(current_entity=None, entity_started=false, current_span=[], in_error=false, error_message="") %}
-                                
-                                {% for token, tag in sent_data.raw_prediction %}
-                                    {% if tag == 'O' %}
-                                        {# Zakończ aktualny span encji, jeśli istnieje #}
-                                        {% if ns.entity_started %}
-                                            <span class="entity entity-{{ ns.current_entity }} {% if ns.in_error %}has-error{% endif %}" 
-                                                title="{% if ns.in_error %}{{ ns.error_message }}{% else %}Entity: {{ ns.current_entity }}{% endif %}">
-                                                {{ ' '.join(ns.current_span) }}
-                                            </span>
-                                            {% set ns.entity_started = false %}
-                                            {% set ns.current_span = [] %}
-                                            {% set ns.in_error = false %}
-                                            {% set ns.error_message = "" %}
-                                        {% endif %}
-                                        {{ token }}
-                                    {% else %}
-                                        {# Token jest częścią encji #}
-                                        {% set entity_type = tag[2:] %}
-                                        
-                                        {# Sprawdź, czy to nowa encja czy kontynuacja #}
-                                        {% if tag.startswith('B-') %}
-                                            {# Poprawne rozpoczęcie nowej encji #}
-                                            
-                                            {# Zakończ poprzednią encję, jeśli istnieje #}
+            <div id="results-container" class="results-scrollable">
+                {% for sent_id, sent_data in grouped_by_sent.items() %}
+                    <div class="card" style="color: black; margin-bottom: 20px;">
+                        <div class="sentence-container mb-4" style="text-align: left;">
+                            <div class="card-header">
+                                <h3>{{ sent_id }}</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="highlighted-text">
+                                    {% set ns = namespace(current_entity=None, entity_started=false, current_span=[], in_error=false, error_message="") %}
+                                    
+                                    {% for token, tag in sent_data.raw_prediction %}
+                                        {% if tag == 'O' %}
+                                            {# Zakończ aktualny span encji, jeśli istnieje #}
                                             {% if ns.entity_started %}
-                                                <span class="entity entity-{{ ns.current_entity }} {% if ns.in_error %}has-error{% endif %}"
+                                                <span class="entity entity-{{ ns.current_entity }} {% if ns.in_error %}has-error{% endif %}" 
                                                     title="{% if ns.in_error %}{{ ns.error_message }}{% else %}Entity: {{ ns.current_entity }}{% endif %}">
                                                     {{ ' '.join(ns.current_span) }}
                                                 </span>
+                                                {% set ns.entity_started = false %}
                                                 {% set ns.current_span = [] %}
+                                                {% set ns.in_error = false %}
+                                                {% set ns.error_message = "" %}
                                             {% endif %}
+                                            {{ token }}
+                                        {% else %}
+                                            {# Token jest częścią encji #}
+                                            {% set entity_type = tag[2:] %}
                                             
-                                            {# Rozpocznij nową encję #}
-                                            {% set ns.entity_started = true %}
-                                            {% set ns.current_entity = entity_type %}
-                                            {% set ns.current_span = [token] %}
-                                            {% set ns.in_error = false %}
-                                            {% set ns.error_message = "" %}
-                                            
-                                        {% elif tag.startswith('I-') %}
-                                            {# Token kontynuacyjny #}
-                                            
-                                            {# Sprawdź błąd: I-tag bez odpowiedniego początku #}
-                                            {% set is_error = not ns.entity_started or ns.current_entity != entity_type %}
-                                            
-                                            {% if not ns.entity_started %}
-                                                {# Rozpoczęcie encji od I-tag (błąd) #}
+                                            {# Sprawdź, czy to nowa encja czy kontynuacja #}
+                                            {% if tag.startswith('B-') %}
+                                                {# Poprawne rozpoczęcie nowej encji #}
+                                                
+                                                {# Zakończ poprzednią encję, jeśli istnieje #}
+                                                {% if ns.entity_started %}
+                                                    <span class="entity entity-{{ ns.current_entity }} {% if ns.in_error %}has-error{% endif %}"
+                                                        title="{% if ns.in_error %}{{ ns.error_message }}{% else %}Entity: {{ ns.current_entity }}{% endif %}">
+                                                        {{ ' '.join(ns.current_span) }}
+                                                    </span>
+                                                    {% set ns.current_span = [] %}
+                                                {% endif %}
+                                                
+                                                {# Rozpocznij nową encję #}
                                                 {% set ns.entity_started = true %}
                                                 {% set ns.current_entity = entity_type %}
                                                 {% set ns.current_span = [token] %}
-                                                {% set ns.in_error = true %}
-                                                {% set ns.error_message = "BŁĄD: Sekwencja rozpoczyna się od I-" ~ entity_type ~ " zamiast B-" ~ entity_type %}
-                                            {% elif ns.current_entity != entity_type %}
-                                                {# Zmiana typu encji bez B-tag (błąd) #}
-                                                <span class="entity entity-{{ ns.current_entity }} {% if ns.in_error %}has-error{% endif %}"
-                                                    title="{% if ns.in_error %}{{ ns.error_message }}{% else %}Entity: {{ ns.current_entity }}{% endif %}">
-                                                    {{ ' '.join(ns.current_span) }}
-                                                </span>
+                                                {% set ns.in_error = false %}
+                                                {% set ns.error_message = "" %}
                                                 
-                                                {# Rozpocznij nową encję #}
-                                                {% set ns.current_entity = entity_type %}
-                                                {% set ns.current_span = [token] %}
-                                                {% set ns.in_error = true %}
-                                                {% set ns.error_message = "BŁĄD: Zmiana typu encji z " ~ ns.current_entity ~ " na " ~ entity_type ~ " bez B-" ~ entity_type %}
-                                            {% else %}
-                                                {# Poprawna kontynuacja - dodaj token do aktualnego spanu #}
-                                                {% set ns.current_span = ns.current_span + [token] %}
+                                            {% elif tag.startswith('I-') %}
+                                                {# Token kontynuacyjny #}
+                                                
+                                                {# Sprawdź błąd: I-tag bez odpowiedniego początku #}
+                                                {% set is_error = not ns.entity_started or ns.current_entity != entity_type %}
+                                                
+                                                {% if not ns.entity_started %}
+                                                    {# Rozpoczęcie encji od I-tag (błąd) #}
+                                                    {% set ns.entity_started = true %}
+                                                    {% set ns.current_entity = entity_type %}
+                                                    {% set ns.current_span = [token] %}
+                                                    {% set ns.in_error = true %}
+                                                    {% set ns.error_message = "BŁĄD: Sekwencja rozpoczyna się od I-" ~ entity_type ~ " zamiast B-" ~ entity_type %}
+                                                {% elif ns.current_entity != entity_type %}
+                                                    {# Zmiana typu encji bez B-tag (błąd) #}
+                                                    <span class="entity entity-{{ ns.current_entity }} {% if ns.in_error %}has-error{% endif %}"
+                                                        title="{% if ns.in_error %}{{ ns.error_message }}{% else %}Entity: {{ ns.current_entity }}{% endif %}">
+                                                        {{ ' '.join(ns.current_span) }}
+                                                    </span>
+                                                    
+                                                    {# Rozpocznij nową encję #}
+                                                    {% set ns.current_entity = entity_type %}
+                                                    {% set ns.current_span = [token] %}
+                                                    {% set ns.in_error = true %}
+                                                    {% set ns.error_message = "BŁĄD: Zmiana typu encji z " ~ ns.current_entity ~ " na " ~ entity_type ~ " bez B-" ~ entity_type %}
+                                                {% else %}
+                                                    {# Poprawna kontynuacja - dodaj token do aktualnego spanu #}
+                                                    {% set ns.current_span = ns.current_span + [token] %}
+                                                {% endif %}
                                             {% endif %}
                                         {% endif %}
-                                    {% endif %}
+                                        
+                                        {# Dodaj spację między tokenami, ale nie po ostatnim tokenie #}
+                                        {% if not loop.last and tag == 'O' %} {% endif %}
+                                    {% endfor %}
                                     
-                                    {# Dodaj spację między tokenami, ale nie po ostatnim tokenie #}
-                                    {% if not loop.last and tag == 'O' %} {% endif %}
-                                {% endfor %}
-                                
-                                {# Zamknij ostatni span encji, jeśli istnieje #}
-                                {% if ns.entity_started %}
-                                    <span class="entity entity-{{ ns.current_entity }} {% if ns.in_error %}has-error{% endif %}"
-                                        title="{% if ns.in_error %}{{ ns.error_message }}{% else %}Entity: {{ ns.current_entity }}{% endif %}">
-                                        {{ ' '.join(ns.current_span) }}
-                                    </span>
-                                {% endif %}
-                            </div>
-                            <div style="padding: 10px;">
-                                <h5>Found tags:</h5>
-                                    {% if sent_data.human_readable_grouped_by_tags %}
-                                        {% for tag, values in sent_data.human_readable_grouped_by_tags.items() %}
-                                            <strong>{{ tag }}:</strong>{{ values }} <br>
-                                        {% endfor %}
+                                    {# Zamknij ostatni span encji, jeśli istnieje #}
+                                    {% if ns.entity_started %}
+                                        <span class="entity entity-{{ ns.current_entity }} {% if ns.in_error %}has-error{% endif %}"
+                                            title="{% if ns.in_error %}{{ ns.error_message }}{% else %}Entity: {{ ns.current_entity }}{% endif %}">
+                                            {{ ' '.join(ns.current_span) }}
+                                        </span>
                                     {% endif %}
-                                <br>
-                                <h5>Tokenized sentence:</h5>
-                                <p>{{ sent_data.tokens }}</p>
+                                </div>
+                                <div style="padding: 10px;">
+                                    <h5>Found tags:</h5>
+                                        {% if sent_data.human_readable_grouped_by_tags %}
+                                            {% for tag, values in sent_data.human_readable_grouped_by_tags.items() %}
+                                                <strong>{{ tag }}:</strong>{{ values }} <br>
+                                            {% endfor %}
+                                        {% endif %}
+                                    <br>
+                                    <h5>Tokenized sentence:</h5>
+                                    <p>{{ sent_data.tokens }}</p>
 
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    </div>
-                {% endfor %}
-               
+                        </div>
+                    {% endfor %}
+            </div>  
 
         {% endif %}
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const textArea = document.getElementById('text-area-input');
+        const charCount = document.getElementById('char-count');
+        
+        if (textArea && charCount) {
+            const maxLength = 10000;
+            
+            function updateCharCount() {
+                const text = textArea.value;
+                const textWithoutNewlines = text.replace(/[\r\n]+/g, '');
+                const currentLength = textWithoutNewlines.length;
+                
+                charCount.textContent = `${currentLength} / ${maxLength}`;
+                
+                charCount.classList.remove('char-counter-warning', 'char-counter-danger');
+                
+                if (currentLength >= maxLength) {
+                    charCount.classList.add('char-counter-danger');
+                } else if (currentLength >= maxLength * 0.9) {
+                    charCount.classList.add('char-counter-warning');
+                }
+            }
+            
+            textArea.addEventListener('input', updateCharCount);
+            updateCharCount();
+        }
+    });
+</script>
 {% endblock content %}
