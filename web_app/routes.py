@@ -3,7 +3,7 @@ import asyncio
 from pathlib import Path
 from collections import defaultdict
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from flask import render_template, request
+from flask import render_template, request, flash
 import requests
 
 from web_app import app, forms
@@ -20,7 +20,7 @@ def process_form_data(file_input: list, text_area_input: str) -> dict:
         text_from_files = ""
         files = file_input
         for file in files:
-            text_from_files += file.read().decode("ascii") + "\n"
+            text_from_files += file.read().decode("utf-8") + "\n"
         
         data = {
             "text_list": [f"{textarea_val}\n{text_from_files}"],
@@ -70,13 +70,18 @@ async def home():
     all_tags_summary = None
     if form_validation:
         file_input = form.file_input.data if form.file_input.data else []
-        text_area_input = form.text_area.data
+        text_area_input = form.text_area.data if form.text_area.data else ""
 
-        # res = process_form_data(file_input, text_area_input)
-        res: dict = await asyncio.to_thread(process_form_data, file_input, text_area_input)
-        predictions_len = res.get("predictions_len")
-        grouped_by_sent = res.get("grouped_by_sent")
-        all_tags_summary = res.get("all_tags_summary")
+        try:
+            # res = process_form_data(file_input, text_area_input)
+            res: dict = await asyncio.to_thread(process_form_data, file_input, text_area_input)
+            predictions_len = res.get("predictions_len")
+            grouped_by_sent = res.get("grouped_by_sent")
+            all_tags_summary = res.get("all_tags_summary")
+        except Exception as e:
+            error_message = f"Error occured during processing (shieeeeet): {str(e)}"
+            flash(error_message, "danger")
+            app.logger.error(f"Error in process_form_data: {e}", exc_info=True)
         
         # return render_template("home.html", form=form)
     return render_template("home.html",
