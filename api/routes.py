@@ -33,7 +33,7 @@ def extract_named_entities(tagged_words: List[List[Tuple[str, str]]]) -> default
     current_tag = None
 
     for word, tag in tagged_words:
-        # Przypadek tagu "O" (Outside)
+        # tag O
         if tag == "O":
             if current_entity and current_tag:
                 entities[current_tag].append(current_entity.strip())
@@ -41,34 +41,31 @@ def extract_named_entities(tagged_words: List[List[Tuple[str, str]]]) -> default
                 current_tag = None
             continue
         
-        # Obsługa tagów z prefiksami (B- lub I-)
+        # tags B- or I-
         if "-" in tag:
             state, entity_type = tag.split("-")
             
-            # Przypadek 1: Początek nowej encji (B-)
+            # B-
             if state == "B":
-                # Zapisz poprzednią encję, jeśli istnieje
                 if current_entity and current_tag:
                     entities[current_tag].append(current_entity.strip())
-                # Rozpocznij nową encję
+
                 current_entity = word
                 current_tag = entity_type
             
-            # Przypadek 2: Kontynuacja encji (I-)
+            # I-
             elif state == "I":
-                # Standardowa kontynuacja - ten sam typ encji
                 if current_tag == entity_type:
                     current_entity += " " + word
-                # Edge case: Tag I- bez poprzedzającego B-
+                # Edge case: Tag I- witn no B-
                 else:
-                    # Zapisz poprzednią encję, jeśli istnieje
                     if current_entity and current_tag:
                         entities[current_tag].append(current_entity.strip())
-                    # Traktuj I- jako rozpoczęcie nowej encji
+
                     current_entity = word
                     current_tag = entity_type
         
-        # Obsługa tagów bez prefiksów (jeśli takie istnieją)
+        # if sth left
         else:
             if current_entity and current_tag:
                 entities[current_tag].append(current_entity.strip())
