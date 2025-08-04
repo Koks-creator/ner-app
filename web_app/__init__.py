@@ -42,18 +42,19 @@ def create_app() -> Flask:
         template_folder=TEMPLATE_DIR,
         static_folder=STATIC_DIR
     )
-    
+    os.makedirs(Config.WEB_APP_TEMP_FOLDER, exist_ok=True)
     setup_logging(app)
     app.logger.info("Starting web app")
     try:
         req = requests.get(Config.API_URL)
         if req.status_code != 200:
-            app.logger.error(f"Could not connect to the api: {req.status_cod=}")
+            app.logger.error(f"Could not connect to the api: {req.status_code=}")
     except Exception:
          app.logger.error("Could not connect to the api", exc_info=True)
     
     app.secret_key = os.getenv("SECRET_KEY")
     app.config["TESTING"] = Config.WEB_APP_TESTING
+    app.config['PERMANENT_SESSION_LIFETIME'] = Config.WEB_APP_SESSION_TIME
     
     app.logger.info("Starting predictor")
     
