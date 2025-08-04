@@ -43,7 +43,9 @@ class Config:
     WEB_APP_LOG_FILE: str = f"{ROOT_PATH}/web_app/logs/web_app.logs"
     WEB_APP_TESTING: bool = False
     WEB_APP_MAX_FILES: int = 10
-    WEB_APP_MAX_FILES_SIZE_MB: int = 10 
+    WEB_APP_MAX_FILES_SIZE_MB: int = 500
+    WEB_APP_TEMP_FOLDER: Path =  f"{ROOT_PATH}/web_app/temp"
+    WEB_APP_SESSION_TIME: int = 10
 
     # LOGGER
     UVICORN_LOG_CONFIG_PATH: Union[str, os.PathLike, Path] = f"{ROOT_PATH}/api/uvicorn_log_config.json"
