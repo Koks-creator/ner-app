@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple
 import re
 from pathlib import Path
 import pickle
@@ -35,7 +35,7 @@ class NerPredictor:
         tokens = word_tokenize(text.lower())
         return tokens
 
-    def encode_data(self, sentence: str) -> List[str]:
+    def encode_data(self, sentence: str) -> Tuple[List[int], List[str]]:
         tokens = self.tokenize_sentence(sentence)
         word_indices = []
 
@@ -55,7 +55,7 @@ class NerPredictor:
 
         return word_indices, tokens
     
-    def get_predictions(self, texts_list: List[str]):
+    def get_predictions(self, texts_list: List[str]) -> Tuple[List[List[Tuple[str, str]]], List[List[str]]]:
         tokens_list = []
         word_indices_list = []
 
@@ -108,6 +108,8 @@ if __name__ == "__main__":
         texts_list=["The FBI's has opened an investigation against former FBI and CIA directors. Russian interference in the US election is in the background. Conference will start at 20.07.2025"]
     )
     print(x)
+    print()
+    print(y)
     # test_cases = ['Adam"s', "Adam's", 'Adam`s', "Adam's", 'He said "hello"']
     # print(ner_pred.tokenize_sentence('Adam"s'))
     # for c in test_cases:
